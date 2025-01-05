@@ -1,133 +1,137 @@
-# Importing libraries
+# استيراد المكتبات
 import numpy as np
 import pandas as pd
-
-# Data visualization libraries
 import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
+from flask import Flask, request, jsonify
+import pickle
+import os
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+import joblib
 
 # -------------------------------------------------------
-# Load the dataset
-file_path = r'C:\Users\Elbostan\Desktop\full project\supermarket_sales - Sheet1.csv'
+# تحميل البيانات
+file_path = r'C:\Users\Elbostan\Desktop\full project\super market eda\supermarket_sales - Sheet1.csv'
 
-# Ensure the file path is valid
-import os
-assert os.path.exists(file_path), "File not found!"
+# التأكد من صحة المسار
+assert os.path.exists(file_path), "الملف غير موجود!"
 
 data = pd.read_csv(file_path)
 
-# Display basic dataset information
+# عرض المعلومات الأساسية
 print(data.head())
 print(data.tail())
 print(data.info())
 print(data.isna().sum())
 
 # ----------------------------------------------------
-# Summary statistics
+# الإحصائيات الوصفية
 summary = data.describe()
 
-# Plot a heatmap for summary statistics
+# رسم Heatmap للإحصائيات الوصفية
 fig = px.imshow(
     summary,
     color_continuous_scale="RdYlGn",
-    title='Heat Map for Summary Statistics of Data',
-    labels={"x": "Data Columns", "y": "Statistics"}
+    title='خريطة الحرارة للإحصائيات الوصفية للبيانات',
+    labels={"x": "أعمدة البيانات", "y": "الإحصائيات"}
 )
-
 fig.update_layout(
     title_font_size=20,
-    xaxis_title='Data Columns',
-    yaxis_title='Summary',
+    xaxis_title='أعمدة البيانات',
+    yaxis_title='الإحصائيات',
     xaxis_tickangle=45
 )
 fig.show()
 
 # ----------------------------------------------------
-# Group data by Customer Type and Gender
+# تجميع البيانات حسب نوع العميل والجنس
 gender_customer_counts = data.groupby(['Customer type', 'Gender']).size().reset_index(name='Count')
 print(gender_customer_counts)
 
-# Barplot for Gender by Customer Type
+# رسم باربلوت لعدد العملاء حسب الجنس ونوع العميل
 sns.barplot(x='Customer type', y='Count', hue='Gender', data=gender_customer_counts)
-plt.title('Number of Genders by Customer Type')
-plt.xlabel('Customer Type')
-plt.ylabel('Count')
+plt.title('عدد الجنسين حسب نوع العميل')
+plt.xlabel('نوع العميل')
+plt.ylabel('العدد')
 plt.show()
 
 # ----------------------------------------------------
-# Group data by Customer Type and Branch
+# تجميع البيانات حسب نوع العميل والفروع
 customer_type_in_branches = data.groupby(["Customer type", "Branch"]).size().reset_index(name='Count')
 print(customer_type_in_branches)
 
-# Plot a grouped bar chart for Customer Type in Branches
+# رسم باربلوت لتوزيع العملاء حسب الفروع
 fig = px.bar(customer_type_in_branches, x="Branch", y="Count", color="Customer type", barmode="group")
 fig.show()
 
 # ----------------------------------------------------
-# Barplot for Product Prices
+# رسم باربلوت لأسعار المنتجات
 plt.figure(figsize=(25, 8))
 sns.barplot(x='Product line', y='Unit price', data=data, palette='Blues')
-plt.title('Product Prices')
-plt.xlabel('Product Line')
-plt.ylabel('Unit Price')
+plt.title('أسعار المنتجات')
+plt.xlabel('خط الإنتاج')
+plt.ylabel('سعر الوحدة')
 plt.show()
 
 # -----------------------------------------------------
-# Value counts for Product Line
+# حساب تكرارات خطوط المنتجات
 product_line_counts = data['Product line'].value_counts().reset_index()
 product_line_counts.columns = ['Product line', 'Count']
 print(product_line_counts)
 
-# Plot Quantity by Product Line with Unit Price as color
+# رسم كميات المنتجات حسب خط الإنتاج وسعر الوحدة
 fig = px.bar(data, x="Product line", y="Quantity", color='Unit price', barmode="group")
 fig.show()
 
 # --------------------------------------------------------
-# Plot Quantity by Date and Product Line
+# رسم كميات المنتجات حسب التاريخ وخط الإنتاج
 fig = px.bar(data, x="Date", y="Quantity", color="Product line", title="مجموع الكميات حسب خط الإنتاج والتاريخ")
 fig.show()
 
-# Plot Quantity by Date and Branch
+# رسم كميات المنتجات حسب التاريخ والفروع
 fig = px.bar(data, x="Date", y="Quantity", color="Branch", title="مجموع الكميات حسب الفرع والتاريخ")
 fig.show()
 
 # --------------------------------------------------------
-# COGS and Product Line
+# تحليل COGS وخطوط الإنتاج
 cogs_product_line = data.groupby(['cogs', 'Product line']).size().reset_index(name='Count')
 cogs_product_line.drop(['Count'], axis=1, inplace=True)
 print(cogs_product_line)
 
 # -------------------------------------------------------
-# Scatter plot for Quantity vs COGS and Quantity vs Gross Income
+# رسم بياني لعدد الكميات مقابل COGS ودخل إجمالي
 fig = go.Figure()
 
-# Add Quantity vs COGS
+# إضافة العلاقة بين الكميات و COGS
 fig.add_trace(go.Scatter(x=data['Quantity'], y=data['cogs'], mode='markers', name='Quantity vs COGS'))
 
-# Add Quantity vs Gross Income
+# إضافة العلاقة بين الكميات والدخل الإجمالي
 fig.add_trace(go.Scatter(x=data['Quantity'], y=data['gross income'], mode='markers', name='Quantity vs Gross Income'))
 
 fig.update_layout(
-    title='Multiple Relationships Between Columns',
-    xaxis_title='Quantity',
-    yaxis_title='Values',
-    legend_title='Relationships'
+    title='علاقات متعددة بين الأعمدة',
+    xaxis_title='الكمية',
+    yaxis_title='القيم',
+    legend_title='العلاقات'
 )
 fig.show()
 
 # ----------------------------------------------------
-# Barplot for Product Line Ratings
+# رسم بياني لخطوط الإنتاج مقابل التقييم
 plt.figure(figsize=(25, 8))
 sns.barplot(x='Product line', y='Rating', data=data, palette='Blues')
-plt.title('Product Line vs Rating')
-plt.xlabel('Product Line')
-plt.ylabel('Rating')
+plt.title('خطوط الإنتاج مقابل التقييم')
+plt.xlabel('خط الإنتاج')
+plt.ylabel('التقييم')
 plt.show()
 
 # ----------------------------------------------------
-# Pairplot for numerical columns
+# رسم Pairplot للأعمدة الرقمية
 sns.pairplot(
     data[["Quantity", "Tax 5%", "gross margin percentage", "gross income"]],
     palette="viridis"
@@ -135,14 +139,14 @@ sns.pairplot(
 plt.show()
 
 # -----------------------------------------------------
-# Correlation Heatmap for Numerical Columns
+# خريطة الحرارة للتباين بين الأعمدة الرقمية
 numerical_columns = data.select_dtypes(include=['int', 'float']).columns
 correlation_matrix = data[numerical_columns].corr()
 
-# Use Seaborn's built-in styles
-sns.set_style('darkgrid')  # Options: 'white', 'dark', 'whitegrid', 'darkgrid', 'ticks'
+# استخدام أنماط Seaborn المدمجة
+sns.set_style('darkgrid')
 
-# Heatmap for Correlation Matrix
+# رسم خريطة الحرارة للتباين بين الأعمدة
 plt.figure(figsize=(10, 8))
 sns.heatmap(
     correlation_matrix,
@@ -152,5 +156,52 @@ sns.heatmap(
     vmin=-1,
     vmax=1
 )
-plt.title('Correlation Heatmap')
+plt.title('خريطة الحرارة للتباين بين الأعمدة')
 plt.show()
+
+#---------------------------------------------------
+# حذف العمود غير المطلوب
+data.drop(["Invoice ID"], axis=1, inplace=True)
+
+# ترميز الأعمدة النصية باستخدام LabelEncoder
+le = LabelEncoder()
+for col in data.columns:
+    if data[col].dtype == 'object':  
+        data[col] = le.fit_transform(data[col])
+
+# -----------------------------------------------------
+# تطبيق MinMaxScaler على البيانات
+scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(data)
+
+# -------------------------------------------------------
+# تحديد المتغيرات المستقلة والتابعة
+col_to_drop = data.columns[-2]
+X = data.drop(columns=[col_to_drop])
+y = data.iloc[:, -2]
+
+# -------------------------------------------------------
+# تقسيم البيانات إلى تدريب واختبار
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# إنشاء نموذج الانحدار الخطي
+model = LinearRegression()
+
+# تدريب النموذج
+model.fit(X_train, y_train)
+
+# التنبؤ بالقيم باستخدام البيانات الاختبارية
+y_pred = model.predict(X_test)
+
+# تقييم النموذج
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+# عرض النتائج
+print(f"Mean Squared Error: {mse}")
+print(f"R-squared: {r2}")
+
+# ----------------------------------------------------
+# حفظ النموذج باستخدام joblib
+joblib.dump(model, 'model.pkl')
+
